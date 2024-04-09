@@ -42,24 +42,30 @@ document.addEventListener('DOMContentLoaded', (event) => {
 });
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelector('form').addEventListener('submit', function(event) {
-        // Prevent the form from being submitted to the server
         event.preventDefault();
-    
-        // Create a FormData object from the form
+
         var formData = new FormData(event.target);
-    
-        // Send the form data to the server
+
         fetch(event.target.action, {
             method: 'POST',
             body: formData
         })
         .then(response => response.json())
         .then(data => {
-            // Handle the server response
-            console.log(data);
+            if (data.access_token && data.refresh_token) {
+                // The user is logged in
+                localStorage.setItem('access_token', data.access_token);
+                localStorage.setItem('refresh_token', data.refresh_token);
+
+                // Alter the UI for logged in user
+                document.querySelector('#login').style.display = 'none';
+                document.querySelector('#logout').style.display = 'block';
+            } else if (data.detail) {
+                // The server returned an error message
+                alert(data.detail);
+            }
         })
         .catch(error => {
-            // Handle the error
             console.error('Error:', error);
         });
     });

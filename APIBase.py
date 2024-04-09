@@ -141,9 +141,7 @@ async def logout(
     crud.update_user_refresh_token(
         db,
         schemas.UserRefreshTokenUpdate(
-            username=refresh_token.username,
-            refresh_token="",
-            refresh_token_expires=datetime.utcnow(),
+            username=refresh_token.username, refresh_token="", refresh_token_expires=""
         ),
     )
     return {"message": "Logout successful"}

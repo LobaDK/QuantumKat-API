@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from datetime import datetime
 
 
 class UserSearch(BaseModel):
@@ -7,4 +8,4 @@ class UserSearch(BaseModel):
 
 class UserRefreshTokenUpdate(UserSearch):
     refresh_token: str
-    refresh_token_expires: str
+    refresh_token_expires: datetime

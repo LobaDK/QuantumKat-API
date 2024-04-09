@@ -6,24 +6,28 @@ from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from datetime import timedelta
+from datetime import timedelta, datetime
 from dotenv import load_dotenv
 from os import environ
 
-from sql_app import models
+from sql_app import models, crud, schemas
 from sql_app.database import SessionLocal, engine
 
 load_dotenv()
 
 SECRET_KEY = environ.get("SECRET_KEY")
+if SECRET_KEY is None or SECRET_KEY == "":
+    raise ValueError("SECRET_KEY not set")
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
+REFRESH_TOKEN_EXPIRE_DAYS = 30
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 models.Base.metadata.create_all(bind=engine)
 
-app = FastAPI()
+app = FastAPI(root_path="/api")
 
 
 def get_db():
@@ -51,7 +55,6 @@ async def login(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
-            headers={"WWW-Authenticate": "Bearer"},
         )
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = APIAuth.create_access_token(
@@ -60,7 +63,90 @@ async def login(
         ALGORITHM=ALGORITHM,
         expires_delta=access_token_expires,
     )
-    return {"access_token": access_token, "token_type": "bearer"}
+    refresh_token_expires = timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    refresh_token = APIAuth.create_refresh_token(
+        data={"sub": form_data.username},
+        SECRET_KEY=SECRET_KEY,
+        ALGORITHM=ALGORITHM,
+        expires_delta=refresh_token_expires,
+    )
+    crud.update_user_refresh_token(
+        db,
+        schemas.UserRefreshTokenUpdate(
+            username=form_data.username,
+            refresh_token=refresh_token,
+            refresh_token_expires=datetime.utcnow() + refresh_token_expires,
+        ),
+    )
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+    }
+
+
+@app.post("/token/refresh")
+async def refresh_token(
+    refresh_token: APIAuth.RefreshToken = Depends(),
+    db: Session = Depends(get_db),
+):
+    user = APIAuth.verify_refresh_token(
+        db, refresh_token.username, refresh_token.refresh_token
+    )
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+        )
+    if not APIAuth.verify_refresh_token_expiration(
+        db, refresh_token.username, refresh_token.refresh_token
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token expired",
+        )
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = APIAuth.create_access_token(
+        data={"sub": refresh_token.username},
+        SECRET_KEY=SECRET_KEY,
+        ALGORITHM=ALGORITHM,
+        expires_delta=access_token_expires,
+    )
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+    }
+
+
+@app.post("/logout")
+async def logout(
+    refresh_token: APIAuth.RefreshToken = Depends(),
+    db: Session = Depends(get_db),
+):
+    user = APIAuth.verify_refresh_token(
+        db, refresh_token.username, refresh_token.refresh_token
+    )
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+        )
+    if not APIAuth.verify_refresh_token_expiration(
+        db, refresh_token.username, refresh_token.refresh_token
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token expired",
+        )
+    crud.update_user_refresh_token(
+        db,
+        schemas.UserRefreshTokenUpdate(
+            username=refresh_token.username,
+            refresh_token="",
+            refresh_token_expires=datetime.utcnow(),
+        ),
+    )
+    return {"message": "Logout successful"}
 
 
 @app.get("/logs/")

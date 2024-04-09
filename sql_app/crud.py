@@ -15,3 +15,13 @@ def update_user_refresh_token(db: Session, user: schemas.UserRefreshTokenUpdate)
     db.commit()
     db.refresh(db_user)
     return db_user
+
+
+def get_user_by_refresh_token(db: Session, username: str, refresh_token: str):
+    return (
+        db.query(models.User)
+        .filter(
+            models.User.username == username, models.User.refresh_token == refresh_token
+        )
+        .first()
+    )

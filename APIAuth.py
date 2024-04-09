@@ -1,20 +1,16 @@
 from typing import Optional
 import jwt
 from datetime import datetime, timedelta
+from sql_app import crud
 
 
-def authenticate_user(username, password):
-    with open(".user", "r") as file:
-        lines = file.readlines()
-    for line in lines:
-        if "username" in line:
-            _username = line.split("=")[1].strip().strip('"')
-        elif "password" in line:
-            _password = line.split("=")[1].strip().strip('"')
-    if _username and _password:
-        if username == _username and password == _password:
-            return True
-    return None
+def authenticate_user(db, username, password):
+    user = crud.get_user_by_username(db, username)
+    if not user:
+        return False
+    if not password == user.password:
+        return False
+    return user
 
 
 def create_access_token(

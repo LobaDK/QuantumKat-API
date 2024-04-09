@@ -1,0 +1,13 @@
+from sqlalchemy import Column, Integer, String, DateTime
+
+from .database import Base
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    password = Column(String)
+    refresh_token = Column(String)
+    refresh_token_expires = Column(DateTime)

@@ -5,9 +5,13 @@ from typing import Annotated
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
 from datetime import timedelta
 from dotenv import load_dotenv
 from os import environ
+
+from sql_app import models
+from sql_app.database import SessionLocal, engine
 
 load_dotenv()
 
@@ -17,7 +21,17 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
+models.Base.metadata.create_all(bind=engine)
+
 app = FastAPI()
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 @app.exception_handler(HTTPException)
@@ -29,8 +43,10 @@ async def http_exception_handler(request, exc):
 
 
 @app.post("/token")
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = APIAuth.authenticate_user(form_data.username, form_data.password)
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)
+):
+    user = APIAuth.authenticate_user(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

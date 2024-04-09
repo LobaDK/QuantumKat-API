@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from datetime import timedelta, datetime
 from dotenv import load_dotenv
@@ -28,6 +29,16 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(root_path="/api")
+
+# TODO: Change origins to the actual frontend URL when deploying
+origins = ["http://127.0.0.1:5500"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 def get_db():
